@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Spark/generated data artifacts
+models/
+data/features/churn_features.parquet/
+data/scaled/
+*.crc

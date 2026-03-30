@@ -1,0 +1,16 @@
+=======================================================
+SparkScale Churn — ETL Week 1 Report
+Zaalima Development | Project 4
+=======================================================
+Row Count       : 2,000,000
+Schema Issues   : 0 (none)
+Null Columns    : 0
+Negative Values : tenure=0, charges=0
+Partitions      : 15 (skew=1.00x)
+
+Churn Distribution:
+  No Churn : 1,469,388 (73.47%)
+  Churn    : 530,612 (26.53%)
+
+ETL Runtime     : 18.9s
+=======================================================
