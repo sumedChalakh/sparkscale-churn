@@ -1,3 +1,8 @@
+import os
+import sys
+from pathlib import Path
+
+from pyspark import StorageLevel
 from pyspark.sql import SparkSession
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import LogisticRegression, RandomForestClassifier, GBTClassifier
@@ -5,24 +10,63 @@ from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClass
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 from pyspark.ml.feature import VectorAssembler
 import pyspark.sql.functions as F
+from pyspark.sql.types import NumericType
+from py4j.protocol import Py4JJavaError
+
+os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
+os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 spark = SparkSession.builder \
     .appName("SparkScale_Week3_ML") \
-    .config("spark.sql.shuffle.partitions", "50") \
+    .config("spark.sql.shuffle.partitions", "16") \
+    .config("spark.hadoop.io.native.lib.available", "false") \
+    .config("spark.driver.extraJavaOptions", "-Dhadoop.native.lib=false") \
+    .config("spark.executor.extraJavaOptions", "-Dhadoop.native.lib=false") \
+    .config("spark.driver.memory", "4g") \
+    .config("spark.executor.memory", "4g") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
 
+
+def load_feature_data(spark_session, parquet_dir):
+    try:
+        return spark_session.read.parquet(parquet_dir)
+    except Py4JJavaError as err:
+        if "NativeIO$Windows.access0" not in str(err):
+            raise
+
+        part_files = sorted(str(p) for p in Path(parquet_dir).glob("part-*.parquet"))
+        if not part_files:
+            raise
+
+        print("Detected Windows NativeIO issue. Falling back to explicit parquet part files...")
+        return spark_session.read.parquet(*part_files)
+
 # ── Load ──────────────────────────────────────────────────────────────────────
-df = spark.read.parquet("data/features/churn_features.parquet")
-df = df.withColumn("label", F.col("Churn").cast("double")).drop("Churn")
+df = load_feature_data(spark, "data/features/churn_features.parquet")
+if "Churn" in df.columns:
+    df = df.withColumn("label", F.col("Churn").cast("double")).drop("Churn")
+elif "label" in df.columns:
+    df = df.withColumn("label", F.col("label").cast("double"))
+else:
+    raise ValueError("Input data must include either 'Churn' or 'label' column.")
 
 train, test = df.randomSplit([0.8, 0.2], seed=42)
-train.cache()
-test.cache()
+train.persist(StorageLevel.DISK_ONLY)
+test.persist(StorageLevel.DISK_ONLY)
 
-feat_cols = [c for c in df.columns if c != "label"]
-va = VectorAssembler(inputCols=feat_cols, outputCol="features", handleInvalid="skip")
+use_precomputed_features = "features" in df.columns
+va = None
+
+if not use_precomputed_features:
+    feat_cols = [
+        field.name for field in df.schema.fields
+        if field.name != "label" and isinstance(field.dataType, NumericType)
+    ]
+    if not feat_cols:
+        raise ValueError("No numeric feature columns found after preprocessing.")
+    va = VectorAssembler(inputCols=feat_cols, outputCol="features", handleInvalid="skip")
 
 # ── Evaluators ────────────────────────────────────────────────────────────────
 auc_eval = BinaryClassificationEvaluator(metricName="areaUnderROC")
@@ -54,20 +98,23 @@ models = {
     ),
 }
 
+num_folds = 3
+
 results = {}
 
 for name, (clf, grid) in models.items():
-    print(f"\n{'='*50}\n🔁 Training {name} with CrossValidator (5-fold)\n{'='*50}")
+    print(f"\n{'='*50}\n🔁 Training {name} with CrossValidator ({num_folds}-fold)\n{'='*50}")
 
-    pipe = Pipeline(stages=[va, clf])
+    stages = [clf] if use_precomputed_features else [va, clf]
+    pipe = Pipeline(stages=stages)
 
     cv = CrossValidator(
         estimator=pipe,
         estimatorParamMaps=grid,
         evaluator=auc_eval,
-        numFolds=5,
+        numFolds=num_folds,
         seed=42,
-        parallelism=4
+        parallelism=1
     )
 
     cv_model = cv.fit(train)
@@ -80,8 +127,14 @@ for name, (clf, grid) in models.items():
     results[name] = {"AUC": round(auc, 4), "F1": round(f1, 4), "Acc": round(acc, 4)}
     print(f"  AUC={auc:.4f} | F1={f1:.4f} | Acc={acc:.4f}")
 
-    # save best model
-    cv_model.bestModel.write().overwrite().save(f"models/{name}_best")
+    # On Windows without winutils/HADOOP_HOME, model writes can fail; keep metrics anyway.
+    try:
+        cv_model.bestModel.write().overwrite().save(f"models/{name}_best")
+    except Py4JJavaError as err:
+        if "HADOOP_HOME and hadoop.home.dir are unset" in str(err):
+            print("  Skipping model save on Windows (missing HADOOP_HOME/winutils).")
+        else:
+            raise
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 print("\n\n📊 WEEK 3 RESULTS SUMMARY")
