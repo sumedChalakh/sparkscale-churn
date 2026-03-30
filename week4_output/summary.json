@@ -1,0 +1,87 @@
+{
+  "LR": {
+    "auc": 0.848,
+    "f1": 0.7982,
+    "accuracy": 0.8055,
+    "class_0": {
+      "precision": 0.8427,
+      "recall": 0.9035,
+      "f1": 0.8721
+    },
+    "class_1": {
+      "precision": 0.6684,
+      "recall": 0.5356,
+      "f1": 0.5947
+    },
+    "confusion_matrix": [
+      [
+        132410,
+        14138
+      ],
+      [
+        24708,
+        28500
+      ]
+    ]
+  },
+  "RF": {
+    "auc": 0.846,
+    "f1": 0.7924,
+    "accuracy": 0.8045,
+    "class_0": {
+      "precision": 0.8309,
+      "recall": 0.921,
+      "f1": 0.8736
+    },
+    "class_1": {
+      "precision": 0.6898,
+      "recall": 0.4836,
+      "f1": 0.5686
+    },
+    "confusion_matrix": [
+      [
+        134975,
+        11573
+      ],
+      [
+        27477,
+        25731
+      ]
+    ]
+  },
+  "GBT": {
+    "auc": 0.8759,
+    "f1": 0.8145,
+    "accuracy": 0.8205,
+    "class_0": {
+      "precision": 0.8545,
+      "recall": 0.9104,
+      "f1": 0.8815
+    },
+    "class_1": {
+      "precision": 0.6989,
+      "recall": 0.573,
+      "f1": 0.6297
+    },
+    "confusion_matrix": [
+      [
+        133411,
+        13137
+      ],
+      [
+        22718,
+        30490
+      ]
+    ]
+  },
+  "best_model": "GBT",
+  "best_threshold": 0.3,
+  "threshold_f1": 0.6714,
+  "top_features": [
+    "charge_ratio",
+    "MonthlyCharges",
+    "feature_46",
+    "service_count",
+    "TotalCharges"
+  ]
+}
