@@ -1,0 +1,5 @@
+pyspark==3.5.3
+numpy>=1.26
+pandas>=2.1
+matplotlib>=3.8
+pyarrow>=14.0

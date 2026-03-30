@@ -13,6 +13,7 @@ SparkScale Churn includes:
 - feature engineering
 - model training and comparison (LR, RF, GBT)
 - Week 4 evaluation with ROC/PR curves, confusion matrices, feature importance, and threshold tuning
+- Week 4 reusable batch prediction script for monthly churn scoring
 
 ## Final Results
 
@@ -32,9 +33,11 @@ SparkScale Churn includes:
 - `src/` - modular pipeline files (`etl.py`, `feature_engineering.py`, `week3_ml_pipeline.py`)
 - `week3_ml_pipeline.py` - top-level Week 3 pipeline runner
 - `week4_evaluation.py` - Week 4 full evaluation and reporting script
+- `week4_batch_predict.py` - Week 4 reusable batch scoring script (production-style daily/monthly run)
 - `data/raw/` - input dataset
 - `data/features/` - engineered features parquet
 - `week4_output/` - generated evaluation plots and JSON summary
+- `requirements.txt` - reproducible Python dependencies
 - `docker-compose.yml` - Spark container setup
 
 ## How To Run
@@ -54,6 +57,30 @@ PowerShell (full run):
 PowerShell:
 
 `C:/Users/ACER/anaconda3/envs/first/python.exe week4_evaluation.py`
+
+### 3. Week 4 reusable batch prediction job
+
+PowerShell (predict churn probabilities for new monthly parquet):
+
+`$env:BATCH_INPUT='data/features/churn_features.parquet'; $env:BATCH_MODEL_ROOT='models'; $env:BATCH_MODEL_NAME='GBT'; $env:BATCH_OUTPUT='batch_output/churn_predictions.parquet'; C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py`
+
+Optional CSV output:
+
+`$env:BATCH_OUTPUT_FORMAT='csv'; C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py`
+
+### 4. Reproducible environment
+
+Install dependencies:
+
+`C:/Users/ACER/anaconda3/envs/first/python.exe -m pip install -r requirements.txt`
+
+## Requirement Coverage (Week 1-4)
+
+- Week 1: Docker Spark cluster (master + workers), distributed ETL, schema validation, row checks
+- Week 2: Spark SQL feature engineering and DAG/query-plan inspection
+- Week 3: Spark MLlib distributed training with binary evaluation setup
+- Week 4: reusable batch scoring script + evaluation/reporting workflow
+- Submission artifact support: source code + outputs + `requirements.txt`
 
 ## Week 4 Outputs
 
