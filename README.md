@@ -2,65 +2,76 @@
 
 ## Status
 
-**Project In Progress**
+**Completed (local execution verified)**
 
-This repository is actively being developed. Structure, pipelines, and outputs may change as the project evolves.
+This project implements a PySpark churn workflow from data processing to model evaluation.
 
-### Week 3 Validation
+## Project Summary
 
-- Status: Completed (fast validation mode)
-- Date: 2026-03-30
-- Command used (PowerShell):
-   - `$env:WEEK3_FAST='1'; $env:WEEK3_SAMPLE_FRACTION='0.1'; python week3_ml_pipeline.py`
-- Best model in this validation run: `GBT`
-- Validation metrics (fast mode): AUC `0.8751`, F1 `0.8121`, Accuracy `0.8181`
-
-Note: On Windows without `HADOOP_HOME`/`winutils`, model artifact saving is skipped, but training and evaluation still complete.
-
-## Overview
-
-SparkScale Churn is a PySpark-based churn prediction project with:
-- data ingestion and ETL
+SparkScale Churn includes:
+- data loading and ETL
 - feature engineering
-- model training and evaluation (LR, RF, GBT)
-- Docker-based Spark workflow support
+- model training and comparison (LR, RF, GBT)
+- Week 4 evaluation with ROC/PR curves, confusion matrices, feature importance, and threshold tuning
+
+## Final Results
+
+### Week 3 (training validation)
+- Mode used: fast validation mode
+- Best model: `GBT`
+- Metrics: AUC `0.8751`, F1 `0.8121`, Accuracy `0.8181`
+
+### Week 4 (evaluation)
+- Best model: `GBT`
+- Metrics: AUC `0.8759`, F1 `0.8145`, Accuracy `0.8205`
+- Best threshold by F1: `0.30`
+- Output summary file: `week4_output/summary.json`
 
 ## Repository Structure
 
-- `src/`: pipeline and module source files
-- `data/raw/`: source dataset
-- `data/features/`: generated feature outputs
-- `data/scaled/`: generated scaled datasets
-- `models/`: generated trained model artifacts
+- `src/` - modular pipeline files (`etl.py`, `feature_engineering.py`, `week3_ml_pipeline.py`)
+- `week3_ml_pipeline.py` - top-level Week 3 pipeline runner
+- `week4_evaluation.py` - Week 4 full evaluation and reporting script
+- `data/raw/` - input dataset
+- `data/features/` - engineered features parquet
+- `week4_output/` - generated evaluation plots and JSON summary
+- `docker-compose.yml` - Spark container setup
 
-## Note About Ignored Artifacts
+## How To Run
 
-Large generated artifacts are intentionally excluded from Git to keep the repository lightweight and push-friendly:
-- `data/features/churn_features.parquet/`
-- `data/scaled/`
-- `models/`
-- `*.crc`
+### 1. Week 3 training pipeline
 
-## How To Regenerate Excluded Artifacts
+PowerShell (quick validation):
 
-Run the project pipelines to recreate generated files locally.
+`$env:WEEK3_FAST='1'; $env:WEEK3_SAMPLE_FRACTION='0.1'; C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py`
 
-Example flow:
+PowerShell (full run):
 
-1. Run ETL:
-   - `python src/etl.py`
-2. Run feature engineering:
-   - `python src/feature_engineering.py`
-3. Run ML training pipeline:
-   - `python src/week3_ml_pipeline.py`
+`C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py`
 
-After running these steps, generated outputs will be available in:
-- `data/features/`
-- `data/scaled/`
-- `models/`
+### 2. Week 4 evaluation
 
-## Current Focus
+PowerShell:
 
-- improving pipeline reliability
-- tuning model performance
-- documenting reproducible local and Docker workflows
+`C:/Users/ACER/anaconda3/envs/first/python.exe week4_evaluation.py`
+
+## Week 4 Outputs
+
+Generated in `week4_output/`:
+- `roc_pr_curves.png`
+- `feature_importance.png`
+- `threshold_tuning.png`
+- `confusion_matrices.png`
+- `summary.json`
+
+## Windows Compatibility Notes
+
+This codebase includes runtime fallbacks for common Windows Spark issues:
+- Native Hadoop `winutils`/`HADOOP_HOME` access issues during parquet/model loading
+- fallback model path handling for evaluation when direct model loading is blocked
+
+Because of these safeguards, local Windows runs complete even when Hadoop native binaries are not installed.
+
+## Notes On Tracked vs Generated Artifacts
+
+Large generated artifacts may be ignored for lightweight Git history (for example feature/scaled parquet directories and some Spark artifacts). Recreate them locally by rerunning Week 3 and Week 4 scripts.
