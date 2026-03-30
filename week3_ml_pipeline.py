@@ -16,6 +16,62 @@ from py4j.protocol import Py4JJavaError
 os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
 os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
+FAST_MODE = os.getenv("WEEK3_FAST", "0") == "1"
+SAMPLE_FRACTION = float(os.getenv("WEEK3_SAMPLE_FRACTION", "0.2")) if FAST_MODE else 1.0
+
+
+def get_models_and_folds(is_fast_mode):
+    if is_fast_mode:
+        models = {
+            "LR": (
+                LogisticRegression(featuresCol="features", labelCol="label", maxIter=50),
+                ParamGridBuilder()
+                    .addGrid(LogisticRegression().regParam, [0.1])
+                    .addGrid(LogisticRegression().elasticNetParam, [0.0])
+                    .build()
+            ),
+            "RF": (
+                RandomForestClassifier(featuresCol="features", labelCol="label"),
+                ParamGridBuilder()
+                    .addGrid(RandomForestClassifier().numTrees, [20])
+                    .addGrid(RandomForestClassifier().maxDepth, [5])
+                    .build()
+            ),
+            "GBT": (
+                GBTClassifier(featuresCol="features", labelCol="label", maxIter=20),
+                ParamGridBuilder()
+                    .addGrid(GBTClassifier().maxDepth, [5])
+                    .addGrid(GBTClassifier().stepSize, [0.1])
+                    .build()
+            ),
+        }
+        return models, 2
+
+    models = {
+        "LR": (
+            LogisticRegression(featuresCol="features", labelCol="label", maxIter=100),
+            ParamGridBuilder()
+                .addGrid(LogisticRegression().regParam, [0.01, 0.1])
+                .addGrid(LogisticRegression().elasticNetParam, [0.0, 0.5])
+                .build()
+        ),
+        "RF": (
+            RandomForestClassifier(featuresCol="features", labelCol="label"),
+            ParamGridBuilder()
+                .addGrid(RandomForestClassifier().numTrees, [50, 100])
+                .addGrid(RandomForestClassifier().maxDepth, [5, 10])
+                .build()
+        ),
+        "GBT": (
+            GBTClassifier(featuresCol="features", labelCol="label", maxIter=50),
+            ParamGridBuilder()
+                .addGrid(GBTClassifier().maxDepth, [5, 8])
+                .addGrid(GBTClassifier().stepSize, [0.1, 0.05])
+                .build()
+        ),
+    }
+    return models, 3
+
 spark = SparkSession.builder \
     .appName("SparkScale_Week3_ML") \
     .config("spark.sql.shuffle.partitions", "16") \
@@ -52,6 +108,10 @@ elif "label" in df.columns:
 else:
     raise ValueError("Input data must include either 'Churn' or 'label' column.")
 
+if FAST_MODE:
+    print(f"FAST validation mode enabled. Sampling {SAMPLE_FRACTION:.0%} of rows.")
+    df = df.sample(withReplacement=False, fraction=SAMPLE_FRACTION, seed=42)
+
 train, test = df.randomSplit([0.8, 0.2], seed=42)
 train.persist(StorageLevel.DISK_ONLY)
 test.persist(StorageLevel.DISK_ONLY)
@@ -74,31 +134,7 @@ f1_eval  = MulticlassClassificationEvaluator(metricName="f1")
 acc_eval = MulticlassClassificationEvaluator(metricName="accuracy")
 
 # ── Models + Grids ────────────────────────────────────────────────────────────
-models = {
-    "LR": (
-        LogisticRegression(featuresCol="features", labelCol="label", maxIter=100),
-        ParamGridBuilder()
-            .addGrid(LogisticRegression().regParam, [0.01, 0.1])
-            .addGrid(LogisticRegression().elasticNetParam, [0.0, 0.5])
-            .build()
-    ),
-    "RF": (
-        RandomForestClassifier(featuresCol="features", labelCol="label"),
-        ParamGridBuilder()
-            .addGrid(RandomForestClassifier().numTrees, [50, 100])
-            .addGrid(RandomForestClassifier().maxDepth, [5, 10])
-            .build()
-    ),
-    "GBT": (
-        GBTClassifier(featuresCol="features", labelCol="label", maxIter=50),
-        ParamGridBuilder()
-            .addGrid(GBTClassifier().maxDepth, [5, 8])
-            .addGrid(GBTClassifier().stepSize, [0.1, 0.05])
-            .build()
-    ),
-}
-
-num_folds = 3
+models, num_folds = get_models_and_folds(FAST_MODE)
 
 results = {}
 

@@ -6,6 +6,17 @@
 
 This repository is actively being developed. Structure, pipelines, and outputs may change as the project evolves.
 
+### Week 3 Validation
+
+- Status: Completed (fast validation mode)
+- Date: 2026-03-30
+- Command used (PowerShell):
+   - `$env:WEEK3_FAST='1'; $env:WEEK3_SAMPLE_FRACTION='0.1'; python week3_ml_pipeline.py`
+- Best model in this validation run: `GBT`
+- Validation metrics (fast mode): AUC `0.8751`, F1 `0.8121`, Accuracy `0.8181`
+
+Note: On Windows without `HADOOP_HOME`/`winutils`, model artifact saving is skipped, but training and evaluation still complete.
+
 ## Overview
 
 SparkScale Churn is a PySpark-based churn prediction project with:
