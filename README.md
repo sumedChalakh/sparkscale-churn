@@ -29,7 +29,7 @@ At threshold 0.30, the model catches **78.5% of actual churners** — more valua
 
 ### Top Features (GBT)
 
-`charge_ratio` › `MonthlyCharges` › `service_count` › `TotalCharges` › `Contract_2yr`
+`charge_ratio` › `MonthlyCharges` › `feature_46` › `service_count` › `TotalCharges`
 
 Charge-related signals dominate, confirming that pricing pressure is the primary churn driver in this dataset.
 
@@ -142,11 +142,10 @@ C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py
 - Output: `data/features/churn_features.parquet`
 
 ### Week 3 — Distributed ML Training
-- Three models via `spark.ml` Pipeline + CrossValidator (5-fold CV)
-- `LogisticRegression` → AUC 0.875, F1 0.799
-- `RandomForestClassifier` → AUC 0.843, F1 0.771
-- `GBTClassifier` → AUC **0.875**, F1 **0.812** — best
-- Fast mode: `WEEK3_FAST=1` uses 10% sample for iteration speed
+- Three models via `spark.ml` Pipeline + CrossValidator
+- Full mode uses **3-fold CV**; fast mode uses **2-fold CV**
+- Fast mode: `WEEK3_FAST=1` uses a configurable sample fraction (`WEEK3_SAMPLE_FRACTION`, default 0.2)
+- Saved models are written to `models/LR_best`, `models/RF_best`, and `models/GBT_best`
 
 ### Week 4 — Evaluation & Reporting
 - Per-class Precision / Recall / F1 for all 3 models
@@ -186,5 +185,5 @@ All files written to `week4_output/` after running `week4_evaluation.py`:
 ## Notes
 
 - Large generated artifacts (`data/features/`, scaled parquet directories) are excluded from Git via `.gitignore`. Recreate by rerunning Week 2 and Week 3 scripts.
-- The `week4_evaluation.py` SAMPLE flag is set to `0.10` (≈200K rows) for speed. Set `SAMPLE = None` for full 2M row evaluation.
 - RF numbers vary slightly across runs due to fallback retraining on Windows (no fixed seed propagated through CrossValidator on local mode).
+- Current default sample behavior in evaluation is controlled by env var `WEEK4_SAMPLE` (default `0.10`; set to `none` for full-data evaluation).
