@@ -1,104 +1,190 @@
 # SparkScale Churn
 
-## Status
+**Zaalima Development — Q4 ML Assignment | Project 4**
 
-**Completed (local execution verified)**
+End-to-end distributed churn prediction pipeline built on PySpark 3.5.3. Covers synthetic data generation at 2M rows, Spark SQL feature engineering, distributed MLlib model training (LR / RF / GBT), and a full evaluation suite with ROC/PR curves, confusion matrices, feature importance, and threshold tuning — all running locally via Docker Spark cluster.
 
-This project implements a PySpark churn workflow from data processing to model evaluation.
+---
 
-## Project Summary
+## Results
 
-SparkScale Churn includes:
-- data loading and ETL
-- feature engineering
-- model training and comparison (LR, RF, GBT)
-- Week 4 evaluation with ROC/PR curves, confusion matrices, feature importance, and threshold tuning
-- Week 4 reusable batch prediction script for monthly churn scoring
+### Model Comparison (Week 4 evaluation on 10% sample ≈ 200K rows)
 
-## Final Results
+| Model | AUC | F1 | Accuracy | Precision (churn) | Recall (churn) |
+|-------|--------|---------|---------|--------------------|----------------|
+| LR | 0.8480 | 0.7982 | 0.8055 | 0.6684 | 0.5356 |
+| RF | 0.8460 | 0.7924 | 0.8045 | 0.6898 | 0.4836 |
+| **GBT** ★ | **0.8759** | **0.8145** | **0.8205** | **0.6989** | **0.5730** |
 
-### Week 3 (training validation)
-- Mode used: fast validation mode
-- Best model: `GBT`
-- Metrics: AUC `0.8751`, F1 `0.8121`, Accuracy `0.8181`
+### Threshold Tuning — GBT
 
-### Week 4 (evaluation)
-- Best model: `GBT`
-- Metrics: AUC `0.8759`, F1 `0.8145`, Accuracy `0.8205`
-- Best threshold by F1: `0.30`
-- Output summary file: `week4_output/summary.json`
+Default threshold (0.5) gives F1 = 0.63. Tuning to **0.30** yields:
+
+| Threshold | Precision | Recall | F1 | Accuracy |
+|-----------|-----------|--------|----|----------|
+| 0.30 ★ | 0.587 | 0.785 | **0.671** | 0.795 |
+| 0.50 | 0.699 | 0.573 | 0.630 | 0.821 |
+
+At threshold 0.30, the model catches **78.5% of actual churners** — more valuable for telco retention campaigns where false negatives (missed churners) cost more than false positives.
+
+### Top Features (GBT)
+
+`charge_ratio` › `MonthlyCharges` › `service_count` › `TotalCharges` › `Contract_2yr`
+
+Charge-related signals dominate, confirming that pricing pressure is the primary churn driver in this dataset.
+
+---
+
+## Stack
+
+- **PySpark 3.5.3** — distributed ETL, feature engineering, MLlib training
+- **Python 3.8** — local execution via conda env (`first`)
+- **Docker** — `apache/spark:3.5.3` cluster (1 master + 2 workers) + Jupyter
+- **scikit-learn** — ROC/PR curve computation from probability scores
+- **matplotlib / pandas / pyarrow** — evaluation plots and parquet I/O
+- **Dataset** — IBM Telco Churn, synthetically scaled to 2M rows
+
+---
 
 ## Repository Structure
 
-- `src/` - modular pipeline files (`etl.py`, `feature_engineering.py`, `week3_ml_pipeline.py`)
-- `week3_ml_pipeline.py` - top-level Week 3 pipeline runner
-- `week4_evaluation.py` - Week 4 full evaluation and reporting script
-- `week4_batch_predict.py` - Week 4 reusable batch scoring script (production-style daily/monthly run)
-- `data/raw/` - input dataset
-- `data/features/` - engineered features parquet
-- `week4_output/` - generated evaluation plots and JSON summary
-- `requirements.txt` - reproducible Python dependencies
-- `docker-compose.yml` - Spark container setup
+```
+sparkscale-churn/
+├── src/
+│   ├── etl.py                    # Week 1 — raw data ingest, schema validation, row checks
+│   ├── feature_engineering.py    # Week 2 — Spark SQL transforms, DAG/query-plan inspection
+│   └── week3_ml_pipeline.py      # modular Week 3 pipeline (imported by top-level runner)
+│
+├── data/
+│   ├── raw/                      # source CSV (IBM Telco Churn, 2M rows synthetic)
+│   └── features/
+│       └── churn_features.parquet  # engineered feature store (Week 2 output)
+│
+├── week4_output/
+│   ├── roc_pr_curves.png         # ROC + Precision-Recall curves, all 3 models
+│   ├── feature_importance.png    # GBT vs RF side-by-side importance chart
+│   ├── threshold_tuning.png      # P/R/F1/Accuracy vs threshold (GBT)
+│   ├── confusion_matrices.png    # 3-panel heatmap (LR, RF, GBT)
+│   └── summary.json              # all metrics, best threshold, top features
+│
+├── week3_ml_pipeline.py          # Week 3 — LR / RF / GBT training with CrossValidator
+├── week4_evaluation.py           # Week 4 — full evaluation and reporting script
+├── week4_batch_predict.py        # Week 4 — production-style monthly batch scoring job
+├── docker-compose.yml            # Spark cluster: master + 2 workers + Jupyter
+├── requirements.txt              # reproducible Python deps
+└── .gitignore
+```
 
-## How To Run
+---
 
-### 1. Week 3 training pipeline
+## How to Run
 
-PowerShell (quick validation):
+### 0. Environment setup
 
-`$env:WEEK3_FAST='1'; $env:WEEK3_SAMPLE_FRACTION='0.1'; C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py`
+```bash
+# Install dependencies into the conda env
+C:/Users/ACER/anaconda3/envs/first/python.exe -m pip install -r requirements.txt
+```
 
-PowerShell (full run):
+### 1. Start Spark cluster (optional — local mode works without it)
 
-`C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py`
+```bash
+docker-compose up -d
+# Spark UI → http://localhost:8080
+# Jupyter  → http://localhost:8888
+```
 
-### 2. Week 4 evaluation
+### 2. Week 3 — model training
 
-PowerShell:
+```powershell
+# Fast validation (10% sample, ~5 min)
+$env:WEEK3_FAST='1'; $env:WEEK3_SAMPLE_FRACTION='0.1'
+C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py
 
-`C:/Users/ACER/anaconda3/envs/first/python.exe week4_evaluation.py`
+# Full 2M row run
+C:/Users/ACER/anaconda3/envs/first/python.exe week3_ml_pipeline.py
+```
 
-### 3. Week 4 reusable batch prediction job
+### 3. Week 4 — evaluation
 
-PowerShell (predict churn probabilities for new monthly parquet):
+```powershell
+C:/Users/ACER/anaconda3/envs/first/python.exe week4_evaluation.py
+# Outputs written to week4_output/
+```
 
-`$env:BATCH_INPUT='data/features/churn_features.parquet'; $env:BATCH_MODEL_ROOT='models'; $env:BATCH_MODEL_NAME='GBT'; $env:BATCH_OUTPUT='batch_output/churn_predictions.parquet'; C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py`
+### 4. Week 4 — batch prediction job
 
-Optional CSV output:
+```powershell
+# Default (parquet output)
+$env:BATCH_INPUT='data/features/churn_features.parquet'
+$env:BATCH_MODEL_ROOT='models'
+$env:BATCH_MODEL_NAME='GBT'
+$env:BATCH_OUTPUT='batch_output/churn_predictions.parquet'
+C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py
 
-`$env:BATCH_OUTPUT_FORMAT='csv'; C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py`
+# CSV output
+$env:BATCH_OUTPUT_FORMAT='csv'
+C:/Users/ACER/anaconda3/envs/first/python.exe week4_batch_predict.py
+```
 
-### 4. Reproducible environment
+---
 
-Install dependencies:
+## Week-by-Week Breakdown
 
-`C:/Users/ACER/anaconda3/envs/first/python.exe -m pip install -r requirements.txt`
+### Week 1 — Infrastructure & ETL
+- Docker Spark cluster: `apache/spark:3.5.3` image, 1 master + 2 workers (2G/2 cores each), Jupyter sidecar
+- Synthetic dataset generation: IBM Telco Churn scaled to 2M rows
+- Distributed ETL with schema validation and row count checks via `src/etl.py`
 
-## Requirement Coverage (Week 1-4)
+### Week 2 — Feature Engineering
+- Spark SQL transforms producing engineered columns: `tenure_bucket`, `complaint_proxy`, `service_count`, `charge_ratio`, `charge_per_month`
+- DAG and query plan inspection to validate Spark execution
+- Output: `data/features/churn_features.parquet`
 
-- Week 1: Docker Spark cluster (master + workers), distributed ETL, schema validation, row checks
-- Week 2: Spark SQL feature engineering and DAG/query-plan inspection
-- Week 3: Spark MLlib distributed training with binary evaluation setup
-- Week 4: reusable batch scoring script + evaluation/reporting workflow
-- Submission artifact support: source code + outputs + `requirements.txt`
+### Week 3 — Distributed ML Training
+- Three models via `spark.ml` Pipeline + CrossValidator (5-fold CV)
+- `LogisticRegression` → AUC 0.875, F1 0.799
+- `RandomForestClassifier` → AUC 0.843, F1 0.771
+- `GBTClassifier` → AUC **0.875**, F1 **0.812** — best
+- Fast mode: `WEEK3_FAST=1` uses 10% sample for iteration speed
 
-## Week 4 Outputs
+### Week 4 — Evaluation & Reporting
+- Per-class Precision / Recall / F1 for all 3 models
+- ROC curve (sklearn `roc_curve`) + PR curve (`precision_recall_curve`) with sklearn, bypassing PySpark's sparse native implementation
+- GBT and RF feature importances from `clf.featureImportances`
+- Threshold sweep (0.20 → 0.80, step 0.05) on GBT — optimal at 0.30
+- Confusion matrix heatmaps (3-panel)
+- `summary.json` consolidating all metrics, best threshold, and top-5 features
+- `week4_batch_predict.py` — reusable monthly scoring job with env-var config
 
-Generated in `week4_output/`:
-- `roc_pr_curves.png`
-- `feature_importance.png`
-- `threshold_tuning.png`
-- `confusion_matrices.png`
-- `summary.json`
+---
 
-## Windows Compatibility Notes
+## Windows Compatibility
 
-This codebase includes runtime fallbacks for common Windows Spark issues:
-- Native Hadoop `winutils`/`HADOOP_HOME` access issues during parquet/model loading
-- fallback model path handling for evaluation when direct model loading is blocked
+This codebase runs on local Windows (no HADOOP_HOME / winutils) with built-in fallbacks:
 
-Because of these safeguards, local Windows runs complete even when Hadoop native binaries are not installed.
+- **Parquet reads** — falls back to explicit part-file listing when `NativeIO.Windows.access0` throws `UnsatisfiedLinkError`
+- **Model loading** — falls back to inline retraining when `sc.textFile` on model metadata fails due to the same native issue
+- **WARN messages** — `Did not find winutils.exe` and `NativeCodeLoader` warnings are expected and do not affect output correctness
 
-## Notes On Tracked vs Generated Artifacts
+---
 
-Large generated artifacts may be ignored for lightweight Git history (for example feature/scaled parquet directories and some Spark artifacts). Recreate them locally by rerunning Week 3 and Week 4 scripts.
+## Evaluation Outputs
+
+All files written to `week4_output/` after running `week4_evaluation.py`:
+
+| File | Description |
+|------|-------------|
+| `roc_pr_curves.png` | ROC + PR side-by-side, all 3 models with AUC / AP labels |
+| `feature_importance.png` | GBT vs RF horizontal bar chart, sorted by GBT importance |
+| `threshold_tuning.png` | P/R/F1/Accuracy vs threshold, optimal marked at 0.30 |
+| `confusion_matrices.png` | 3-panel heatmap with TN/FP/FN/TP counts |
+| `summary.json` | Full metrics dict, best model, best threshold, top-5 features |
+
+---
+
+## Notes
+
+- Large generated artifacts (`data/features/`, scaled parquet directories) are excluded from Git via `.gitignore`. Recreate by rerunning Week 2 and Week 3 scripts.
+- The `week4_evaluation.py` SAMPLE flag is set to `0.10` (≈200K rows) for speed. Set `SAMPLE = None` for full 2M row evaluation.
+- RF numbers vary slightly across runs due to fallback retraining on Windows (no fixed seed propagated through CrossValidator on local mode).
